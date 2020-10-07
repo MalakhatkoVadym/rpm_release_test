@@ -1,0 +1,55 @@
+# This is a  workflow to build simple Node.js rpm package
+# created by AlexK
+
+name: Build-simple-RPM-package 
+
+# Controls when the action will run. Triggers the workflow on push 
+# events but only for the main branch
+on:
+  push:
+    branches: [ master ]
+
+# Describe workflow (made up of one or more jobs that can run sequentially or in parallel)
+jobs:
+  build-package:
+    name: CentOS 7
+    runs-on: ubuntu-latest
+    container: centos:7
+    steps:
+
+      # Clone the repository
+      - name: Check-out the repository
+        uses: actions/checkout@v2
+        
+      - name: Install packages
+        run: |
+          yum -y install rpm-build rpm-sign
+          cp -r rpmbuild /github/home/rpmbuild
+      
+      # Runs a set of commands using the runners shell
+      - name: Build package based on SPEC file
+        run: |
+          rpmbuild --version
+          rpmbuild -ba rpmbuild/SPECS/nodejs-webserver.spec
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+  
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: /github/home/rpmbuild/RPMS/x86_64/nodejs-webserver-1-1.4.2-1.el7.x86_64.rpm
+          asset_name: nodejs-webserver-1-1.4.2-1.el7.x86_64.rpm
+          asset_content_type: application/rpm
+  
